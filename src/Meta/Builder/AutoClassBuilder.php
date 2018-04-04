@@ -77,7 +77,7 @@ EOT;
             $out .= " extends NamedObject";
             $isNamed = true;
         } elseif ($class->getPattern() instanceof StraightMappingPattern) {
-            $out .= " extends BaseModel";
+            $out .= " extends \Hesper\Core\Base\BaseModel";
         } elseif (!$class->getPattern() instanceof ValueObjectPattern) {
             $out .= " extends IdentifiableObject";
         }
