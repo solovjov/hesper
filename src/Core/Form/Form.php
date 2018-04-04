@@ -9,9 +9,12 @@ namespace Hesper\Core\Form;
 
 use FormField;
 use Hesper\Core\Base\Assert;
+use Hesper\Core\Base\Identifiable;
+use Hesper\Core\Base\Prototyped;
 use Hesper\Core\Exception\MissingElementException;
 use Hesper\Core\Form\Primitive\BasePrimitive;
 use Hesper\Core\Form\Primitive\FiltrablePrimitive;
+use Hesper\Core\Form\Primitive\ListedPrimitive;
 use Hesper\Core\Form\Primitive\PrimitiveAlias;
 use Hesper\Core\Form\Primitive\PrimitiveForm;
 use Hesper\Core\Form\Primitive\PrimitiveFormsList;
@@ -356,6 +359,51 @@ final class Form extends RegulatedForm {
 		}
 	}
 
+    public function toModel($object, $ignoreNull = true) {
+        Assert::isTrue(is_object($object));
+
+        if ($object instanceof Prototyped) {
+            $proto = $object->proto();
+            $list = $proto->getExpandedPropertyList();
+
+            foreach ($this->getPrimitiveList() as $name => $prm) {
+                if (isset($list[$name])) {
+                    $proto->exportPrimitive($name, $prm, $object, $ignoreNull);
+                }
+            }
+        } else {
+            $class = new \ReflectionClass($object);
+
+            foreach ($this->getPrimitiveList() as $name => $prm) {
+                $setter = 'set' . ucfirst($name);
+
+                if ($prm instanceof ListedPrimitive) {
+                    $value = $prm->getChoiceValue();
+                } else {
+                    $value = $prm->getValue();
+                }
+
+                if ($class->hasMethod($setter) && (!$ignoreNull || ($value !== null))) {
+
+                    if ($prm->getName() == 'id' && $value instanceof Identifiable) {
+                        $value = $value->getId();
+                    }
+
+                    if ($value === null) {
+                        $dropper = 'drop' . ucfirst($name);
+
+                        if ($class->hasMethod($dropper)) {
+                            $object->$dropper();
+                            continue;
+                        }
+                    }
+
+                    $object->$setter($value);
+                }
+            }
+        }
+    }
+
 	/**
 	 * @return Form
 	 **/
@@ -386,8 +434,7 @@ final class Form extends RegulatedForm {
 	 **/
 	private function checkImportResult(BasePrimitive $prm, $result) {
 		if ($prm instanceof PrimitiveAlias && $result !== null) {
-			$this->markGood($prm->getInner()
-			                    ->getName());
+			$this->markGood($prm->getInner()->getName());
 		}
 
 		$name = $prm->getName();
